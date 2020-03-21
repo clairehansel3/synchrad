@@ -84,7 +84,6 @@ def strong_undulator_double_differential(energies, phi_xs, phi_ys, K, k_u, N_u, 
     jvlmau = scipy.special.jv(l, m * a_u)
     sigma_m_1 = np.sum(jvlmau * scipy.special.jv(m + 2 * l, m * b_u), axis=4)
     sigma_m_2 = np.sum(jvlmau * (scipy.special.jv(m + 2 * l + 1, m * b_u) + scipy.special.jv(m + 2 * l - 1, m * b_u)), axis=4)
-    print('sum exit')
     # reshape things
     new_energies = new_energies.reshape(new_energies.shape[:-1])
     new_thetas = new_thetas.reshape(new_thetas.shape[:-1])
