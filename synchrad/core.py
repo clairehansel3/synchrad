@@ -1,9 +1,15 @@
 import ctypes
 import numpy as np
 import pathlib
+import platform
 import random
 
-synchrad_cxx_library = ctypes.cdll.LoadLibrary(pathlib.Path(__file__).parent.parent / 'libsynchrad.so')
+if platform.system() == 'Darwin':
+    libsynchrad = 'libsynchrad.dylib'
+else:
+    libsynchrad = 'libsynchrad.so'
+
+synchrad_cxx_library = ctypes.cdll.LoadLibrary(pathlib.Path(__file__).parent.parent / libsynchrad)
 
 c_light = 299792458
 classical_electron_radius = 2.8179403227e-15
