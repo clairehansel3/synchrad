@@ -1,0 +1,8 @@
+#!/bin/bash
+function movie {
+rm results/$1.mp4
+ffmpeg -framerate 100 -i frames/$1_%d.png -c:v libx264 -pix_fmt yuv420p results/$1.mp4
+}
+movie distribution
+movie double_differential_slice_x
+movie double_differential_slice_y

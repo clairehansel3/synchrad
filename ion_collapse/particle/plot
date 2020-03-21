@@ -1,0 +1,5 @@
+#!/bin/bash
+for i in `seq 0 999`
+do
+  python3 plot.py $i &
+done

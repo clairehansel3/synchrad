@@ -1,0 +1,6 @@
+#!/bin/bash
+for i in `seq 0 127`
+do
+  python3 histogram_movie.py $i &
+done
+python3 plot.py

@@ -1,0 +1,8 @@
+#!/bin/bash
+mkdir -p data
+mkdir -p frames
+mkdir -p results
+for i in `seq 0 127`
+do
+  python3 compute.py $i &
+done

@@ -1,0 +1,3 @@
+#/bin/bash
+ffmpeg -framerate $(expr $(ls frames | wc -l) / 10) -i frames/histogram_%d.png \
+  -c:v libx264 -pix_fmt yuv420p results/histogram.mp4
