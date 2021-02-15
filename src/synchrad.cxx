@@ -18,18 +18,22 @@ struct EnergyPhixPhiy {
 
 extern "C"
 {
-void track_particle(double* result, double x0, double y0, double vx0, double vy0,
+void track_particle_bennett(double* result, double x0, double y0, double vx0, double vy0,
   double gamma_initial, double ion_atomic_number, double plasma_density,
   double rho_ion, double accelerating_field, double bennett_radius_initial,
   double time_step, std::size_t steps);
 
-void compute_radiation(double* __restrict__ result, Particle* __restrict__ data,
+void track_particle_linear(double* result, double x0, double y0, double vx0, double vy0,
+  double gamma_initial, double ion_atomic_number, double plasma_density,
+  double accelerating_field, double time_step, std::size_t steps);
+
+void compute_radiation_grid(double* __restrict__ result, Particle* __restrict__ data,
   double* __restrict__ energies, double* __restrict__ phi_xs,
   double* __restrict__ phi_ys, std::size_t n_particles, std::size_t n_steps,
   std::size_t n_energies, std::size_t n_phi_xs, std::size_t n_phi_ys,
   double time_step);
 
-void compute_radiation2(double* __restrict__ result,
+void compute_radiation_list(double* __restrict__ result,
   Particle* __restrict__ data, EnergyPhixPhiy* __restrict__ inputs,
   std::size_t n_particles, std::size_t n_steps, std::size_t n_inputs,
   double time_step);
@@ -114,7 +118,7 @@ static void rk4(std::array<double, n> y0, std::function<std::array<double, n>(do
   }
 }
 
-void track_particle(double* result, double x0, double y0, double vx0, double vy0,
+void track_particle_bennett(double* result, double x0, double y0, double vx0, double vy0,
   double gamma_initial, double ion_atomic_number, double plasma_density,
   double rho_ion, double accelerating_field, double bennett_radius_initial,
   double time_step, std::size_t steps)
@@ -165,6 +169,51 @@ void track_particle(double* result, double x0, double y0, double vx0, double vy0
   rk4(initial_coordinates, f, write, steps, time_step);
 }
 
+void track_particle_linear(double* result, double x0, double y0, double vx0, double vy0,
+  double gamma_initial, double ion_atomic_number, double plasma_density,
+  double accelerating_field, double time_step, std::size_t steps)
+{
+  SignalHandlerHelper signalhandlerhelper{};
+
+  std::array<double, 5> initial_coordinates;
+  initial_coordinates[0] = x0;
+  initial_coordinates[1] = y0;
+  initial_coordinates[2] = 0;
+  initial_coordinates[3] = gamma_initial * vx0 / c_light;
+  initial_coordinates[4] = gamma_initial * vy0 / c_light;
+
+  double a = (1 + std::pow(initial_coordinates[3], 2) + std::pow(initial_coordinates[4], 2)) * std::pow(gamma_initial, -2);
+  double constant_1 = ion_atomic_number * std::pow(elementary_charge, 2) * plasma_density / (2 * vacuum_permittivity * electron_mass * c_light);
+  double constant_4 = std::sqrt(std::pow(gamma_initial, 2) - std::pow(initial_coordinates[3], 2) - std::pow(initial_coordinates[4], 2) - 1);
+  double constant_5 = -elementary_charge * accelerating_field / (electron_mass * c_light);
+  double constant_6 = gamma_initial * (-0.5 * a - 0.125 * a * a - 0.0625 * a * a * a * a);
+
+  std::function<std::array<double, 5>(double, std::array<double, 5>)> f = [constant_1, constant_4, constant_5, constant_6, gamma_initial](double t, std::array<double, 5> coordinates){
+   double gamma = std::sqrt(1 + std::pow(coordinates[3], 2) + std::pow(coordinates[4], 2) + std::pow(constant_4 + constant_5 * t, 2));
+   std::array<double, 5> rhs;
+   rhs[0] = coordinates[3] * c_light / gamma;
+   rhs[1] = coordinates[4] * c_light / gamma;
+   rhs[2] = c_light * (constant_6 + constant_5 * t + (gamma_initial - gamma)) / gamma;
+   rhs[3] = -constant_1 * coordinates[0];
+   rhs[4] = -constant_1 * coordinates[1];
+   return rhs;
+  };
+
+  std::function<void(double, std::array<double, 5>)> write = [&result, constant_1, constant_4, constant_5](double t, std::array<double, 5> coordinates){
+    double gamma = std::sqrt(1 + std::pow(coordinates[3], 2) + std::pow(coordinates[4], 2) + std::pow(constant_4 + constant_5 * t, 2));
+    double bx = coordinates[3] / gamma;
+    double by = coordinates[4] / gamma;
+    double gamma_dot = (constant_5 * (constant_4 + constant_5 * t) -constant_1 * (coordinates[0] * coordinates[3] + coordinates[1] * coordinates[4])) / gamma;
+    double bxd = (-constant_1 * coordinates[0] / gamma) - (coordinates[3] * gamma_dot * std::pow(gamma, -2));
+    double byd = (-constant_1 * coordinates[1] / gamma) - (coordinates[4] * gamma_dot * std::pow(gamma, -2));
+    std::array<double, 9> new_coordinates{coordinates[0], coordinates[1], coordinates[2], bx, by, gamma, bxd, byd, gamma_dot};
+    std::copy_n(new_coordinates.data(), 9, result);
+    result += 9;
+  };
+
+  rk4(initial_coordinates, f, write, steps, time_step);
+}
+
 static std::array<double, 3> cross(std::array<double, 3> a, std::array<double, 3> b)
 {
   return {
@@ -188,7 +237,7 @@ static double dot(std::array<double, 3> a, std::array<double, 3> b)
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
-void compute_radiation(double* __restrict__ result, Particle* __restrict__ data,
+void compute_radiation_grid(double* __restrict__ result, Particle* __restrict__ data,
   double* __restrict__ energies, double* __restrict__ phi_xs,
   double* __restrict__ phi_ys, std::size_t n_particles, std::size_t n_steps,
   std::size_t n_energies, std::size_t n_phi_xs, std::size_t n_phi_ys,
@@ -196,8 +245,8 @@ void compute_radiation(double* __restrict__ result, Particle* __restrict__ data,
 {
   SignalHandlerHelper signalhandlerhelper{};
 
-  std::size_t i = 0;
-  int percent = -1;
+  //std::size_t i = 0;
+  //int percent = -1;
 
   for (std::size_t j = 0; j != n_energies; ++j) {
     double frequency = energies[j] / hbar_ev;
@@ -213,12 +262,14 @@ void compute_radiation(double* __restrict__ result, Particle* __restrict__ data,
         for (std::size_t m = 0; m != n_particles; ++m) {
           for (std::size_t o = 0; o != n_steps + 1; ++o) {
 
+            /*
             int new_percent = static_cast<int>((100 * i) / (n_energies * n_phi_xs * n_phi_ys * n_particles * (n_steps + 1)));
             if (percent != new_percent) {
               percent = new_percent;
               std::cout << percent << '%' << std::endl;
             }
             ++i;
+            */
 
             double t = time_step * o;
 
@@ -258,15 +309,15 @@ void compute_radiation(double* __restrict__ result, Particle* __restrict__ data,
   }
 }
 
-void compute_radiation2(double* __restrict__ result,
+void compute_radiation_list(double* __restrict__ result,
   Particle* __restrict__ data, EnergyPhixPhiy* __restrict__ inputs,
   std::size_t n_particles, std::size_t n_steps, std::size_t n_inputs,
   double time_step)
 {
   SignalHandlerHelper signalhandlerhelper{};
 
-  std::size_t i = 0;
-  int percent = -1;
+  //std::size_t i = 0;
+  //int percent = -1;
 
   for (std::size_t j = 0; j != n_inputs; ++j) {
     double frequency = inputs[j].energy / hbar_ev;
@@ -280,13 +331,14 @@ void compute_radiation2(double* __restrict__ result,
 
     for (std::size_t m = 0; m != n_particles; ++m) {
       for (std::size_t o = 0; o != n_steps + 1; ++o) {
-
+        /*
         int new_percent = static_cast<int>((100 * i) / (n_inputs * n_particles * (n_steps + 1)));
         if (percent != new_percent) {
           percent = new_percent;
           std::cout << percent << '%' << std::endl;
         }
         ++i;
+        */
 
         double t = time_step * o;
 

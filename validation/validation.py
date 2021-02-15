@@ -102,7 +102,7 @@ def validate_weak_undulator():
     trajectory = synchrad.undulator.weak_undulator_trajectory(K, k_u, gamma, time_step, steps)
     energies, energies_midpoint, energies_step = synchrad.linspace_midpoint(1, 12, 200)
     phi_xs, phi_xs_midpoint, phi_xs_step = synchrad.linspace_midpoint(0, 5e-3, 200)
-    result_numerical = synchrad.compute_radiation(trajectory, energies, phi_xs, np.array([0.0]), time_step)
+    result_numerical = synchrad.compute_radiation_grid(trajectory, energies, phi_xs, np.array([0.0]), time_step)
     dd_numerical = np.sum(result_numerical ** 2, axis=3)
     dd_analytic = synchrad.undulator.weak_undulator_double_differential(energies, phi_xs, np.array([0.0]), K, k_u, N_u, gamma)
 
@@ -110,24 +110,24 @@ def validate_weak_undulator():
 
     vmin1, vmax1 = dd_analytic.min(), dd_analytic.max()
     ax1.set_title('analytic')
-    ax1.pcolormesh(energies_midpoint, phi_xs_midpoint, dd_analytic[:, :, 0].T, vmin=vmin1, vmax=vmax1, cmap='inferno')
+    ax1.pcolormesh(energies_midpoint, phi_xs_midpoint, dd_analytic[:, :, 0].T, vmin=vmin1, vmax=vmax1, cmap='viridis')
     ax1.set_xlim(energies.min(), energies.max())
     ax1.set_ylim(phi_xs.min(), phi_xs.max())
     ax1.set_xlabel('photon energy (eV)')
     ax1.set_ylabel('$\\theta$ (rad)')
     ax1.yaxis.get_major_formatter().set_powerlimits((0, 1))
-    cbar1 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin1, vmax=vmax1), cmap='inferno'), ax=ax1)
+    cbar1 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin1, vmax=vmax1), cmap='viridis'), ax=ax1)
     cbar1.set_label('$\\frac{d^2 U}{d\\Omega d\\epsilon}$')
     cbar1.ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
 
     vmin2, vmax2 = dd_numerical.min(), dd_numerical.max()
     ax2.set_title('numerical')
-    ax2.pcolormesh(energies_midpoint, phi_xs_midpoint, dd_numerical[:, :, 0].T, vmin=vmin2, vmax=vmax2, cmap='inferno')
+    ax2.pcolormesh(energies_midpoint, phi_xs_midpoint, dd_numerical[:, :, 0].T, vmin=vmin2, vmax=vmax2, cmap='viridis')
     ax2.set_xlim(energies.min(), energies.max())
     ax2.set_ylim(phi_xs.min(), phi_xs.max())
     ax2.set_xlabel('photon energy (eV)')
     ax2.yaxis.get_major_formatter().set_powerlimits((0, 1))
-    cbar2 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin2, vmax=vmax2), cmap='inferno'), ax=ax2)
+    cbar2 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin2, vmax=vmax2), cmap='viridis'), ax=ax2)
     cbar2.set_label('$\\frac{d^2 U}{d\\Omega d\\epsilon}$')
     cbar2.ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
 
@@ -140,44 +140,60 @@ def validate_strong_undulator():
     N_u = 10
     energy_mev = 100
     steps = 1000
+    
 
     time_step = N_u * lambda_u / (steps * c_light)
     k_u = 2 * np.pi / lambda_u
     gamma = energy_mev / electron_rest_energy_mev
     trajectory = synchrad.undulator.strong_undulator_trajectory(K, k_u, gamma, time_step, steps)
-    energies, energies_midpoint, energies_step = synchrad.linspace_midpoint(1, 100, 200)
-    phi_xs, phi_xs_midpoint, phi_xs_step = synchrad.linspace_midpoint(0, 2e-2, 200)
-    result_numerical = synchrad.compute_radiation(trajectory, energies, phi_xs, np.array([0.0]), time_step)
+    energies, energies_midpoint, energies_step = synchrad.linspace_midpoint(1, 80, 200)
+    phi_xs, phi_xs_midpoint, phi_xs_step = synchrad.linspace_midpoint(0, 1e-2, 200)
+    result_numerical = synchrad.compute_radiation_grid(trajectory, energies, phi_xs, np.array([0.0]), time_step)
     dd_numerical = np.sum(result_numerical ** 2, axis=3)
     dd_analytic = synchrad.undulator.strong_undulator_double_differential(energies, phi_xs, np.array([0.0]), K, k_u, N_u, gamma, 100, 100)
 
-    fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(plt.rcParams['figure.figsize'][0] * 1.5, plt.rcParams['figure.figsize'][1]))
+    fig, (ax1, ax2, ax3) = plt.subplots(nrows=1, ncols=3, sharey=True, figsize=(plt.rcParams['figure.figsize'][0] * 2, plt.rcParams['figure.figsize'][1]))#gridspec_kw={'width_ratios': [1, 1, 1, 0.15]})
 
     vmin1, vmax1 = dd_analytic.min(), dd_analytic.max()
-    ax1.set_title('analytic')
-    ax1.pcolormesh(energies_midpoint, phi_xs_midpoint, dd_analytic[:, :, 0].T, vmin=vmin1, vmax=vmax1, cmap='inferno')
+    vmin2, vmax2 = dd_numerical.min(), dd_numerical.max()
+    dd_diff = np.abs(dd_numerical - dd_analytic)
+    vmin3, vmax3 = dd_diff.min(), dd_diff.max()
+    
+    vmin = 0 #min([vmin1, vmin2, vmin3])
+    print(vmin1, vmin2, vmin3, vmin)
+    vmax = max([vmax1, vmax2, vmax3])
+    print(vmax1, vmax2, vmax3, vmax)
+    
+
+    ax1.set_title('Analytical')
+    ax1.pcolormesh(energies_midpoint, phi_xs_midpoint * 1e3, dd_analytic[:, :, 0].T, vmin=vmin, vmax=vmax, cmap='viridis')
     ax1.set_xlim(energies.min(), energies.max())
-    ax1.set_ylim(phi_xs.min(), phi_xs.max())
+    ax1.set_ylim(phi_xs.min() * 1e3, phi_xs.max() * 1e3)
     ax1.set_xlabel('photon energy (eV)')
-    ax1.set_ylabel('$\\theta$ (rad)')
-    ax1.yaxis.get_major_formatter().set_powerlimits((0, 1))
-    cbar1 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin1, vmax=vmax1), cmap='inferno'), ax=ax1)
+    ax1.set_ylabel('$\\theta$ (mrad)')
+    #ax1.yaxis.get_major_formatter().set_powerlimits((0, 1))
+
+    ax2.set_title('Numerical')
+    ax2.pcolormesh(energies_midpoint, phi_xs_midpoint * 1e3, dd_numerical[:, :, 0].T, vmin=vmin, vmax=vmax, cmap='viridis')
+    ax2.set_xlim(energies.min(), energies.max())
+    ax2.set_ylim(phi_xs.min() * 1e3, phi_xs.max() * 1e3)
+    ax2.set_xlabel('photon energy (eV)')
+    #ax2.yaxis.get_major_formatter().set_powerlimits((0, 1))
+    
+    ax3.set_title('abs(Numerical - Analytical)')
+    ax3.pcolormesh(energies_midpoint, phi_xs_midpoint * 1e3, dd_diff[:, :, 0].T, vmin=vmin, vmax=vmax, cmap='viridis')
+    ax3.set_xlim(energies.min(), energies.max())
+    ax3.set_ylim(phi_xs.min() * 1e3, phi_xs.max() * 1e3)
+    ax3.set_xlabel('photon energy (eV)')
+    #ax3.yaxis.get_major_formatter().set_powerlimits((0, 1))
+
+    cbar1 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin, vmax=vmax), cmap='viridis'), ax=[ax1,ax2,ax3])
     cbar1.set_label('$\\frac{d^2 U}{d\\Omega d\\epsilon}$')
     cbar1.ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
 
-    vmin2, vmax2 = dd_numerical.min(), dd_numerical.max()
-    ax2.set_title('numerical')
-    ax2.pcolormesh(energies_midpoint, phi_xs_midpoint, dd_numerical[:, :, 0].T, vmin=vmin2, vmax=vmax2, cmap='inferno')
-    ax2.set_xlim(energies.min(), energies.max())
-    ax2.set_ylim(phi_xs.min(), phi_xs.max())
-    ax2.set_xlabel('photon energy (eV)')
-    ax2.yaxis.get_major_formatter().set_powerlimits((0, 1))
-    cbar2 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin2, vmax=vmax2), cmap='inferno'), ax=ax2)
-    cbar2.set_label('$\\frac{d^2 U}{d\\Omega d\\epsilon}$')
-    cbar2.ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
-
-    fig.savefig('strong_undulator.png', dpi=300)
+    fig.savefig('strong_undulator.png', dpi=400)
     plt.close(fig)
+
 
 def validate_weak_linear_plasma():
 
@@ -194,11 +210,11 @@ def validate_weak_linear_plasma():
 
     beta = np.sqrt(1 - gamma ** -2)
     a = K / (beta * gamma * k_u)
-    trajectory = synchrad.track_particle_ion_collapse(a, 0, 0, 0, gamma, 1, plasma_density, 0, 0, 1e9, time_step, steps)
+    trajectory = synchrad.track_particle_bennett(a, 0, 0, 0, gamma, 1, plasma_density, 0, 0, 1e9, time_step, steps)
 
     energies, energies_midpoint, energies_step = synchrad.linspace_midpoint(1e5, 20e5, 200)
     phi_xs, phi_xs_midpoint, phi_xs_step = synchrad.linspace_midpoint(0, 5e-5, 200)
-    result_numerical = synchrad.compute_radiation(trajectory, energies, phi_xs, np.array([0.0]), time_step)
+    result_numerical = synchrad.compute_radiation_grid(trajectory, energies, phi_xs, np.array([0.0]), time_step)
     dd_numerical = np.sum(result_numerical ** 2, axis=3)
     dd_analytic = synchrad.undulator.weak_undulator_double_differential(energies, phi_xs, np.array([0.0]), K, k_u, N_u, gamma)
 
@@ -206,24 +222,24 @@ def validate_weak_linear_plasma():
 
     vmin1, vmax1 = dd_analytic.min(), dd_analytic.max()
     ax1.set_title('analytic')
-    ax1.pcolormesh(energies_midpoint / 1e3, phi_xs_midpoint, dd_analytic[:, :, 0].T, vmin=vmin1, vmax=vmax1, cmap='inferno')
+    ax1.pcolormesh(energies_midpoint / 1e3, phi_xs_midpoint, dd_analytic[:, :, 0].T, vmin=vmin1, vmax=vmax1, cmap='viridis')
     ax1.set_xlim(energies.min() / 1e3, energies.max() / 1e3)
     ax1.set_ylim(phi_xs.min(), phi_xs.max())
     ax1.set_xlabel('photon energy (keV)')
     ax1.set_ylabel('$\\theta$ (rad)')
     ax1.yaxis.get_major_formatter().set_powerlimits((0, 1))
-    cbar1 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin1, vmax=vmax1), cmap='inferno'), ax=ax1)
+    cbar1 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin1, vmax=vmax1), cmap='viridis'), ax=ax1)
     cbar1.set_label('$\\frac{d^2 U}{d\\Omega d\\epsilon}$')
     cbar1.ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
 
     vmin2, vmax2 = dd_numerical.min(), dd_numerical.max()
     ax2.set_title('numerical')
-    ax2.pcolormesh(energies_midpoint / 1e3, phi_xs_midpoint, dd_numerical[:, :, 0].T, vmin=vmin2, vmax=vmax2, cmap='inferno')
+    ax2.pcolormesh(energies_midpoint / 1e3, phi_xs_midpoint, dd_numerical[:, :, 0].T, vmin=vmin2, vmax=vmax2, cmap='viridis')
     ax2.set_xlim(energies.min() / 1e3, energies.max() / 1e3)
     ax2.set_ylim(phi_xs.min(), phi_xs.max())
     ax2.set_xlabel('photon energy (keV)')
     ax2.yaxis.get_major_formatter().set_powerlimits((0, 1))
-    cbar2 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin2, vmax=vmax2), cmap='inferno'), ax=ax2)
+    cbar2 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin2, vmax=vmax2), cmap='viridis'), ax=ax2)
     cbar2.set_label('$\\frac{d^2 U}{d\\Omega d\\epsilon}$')
     cbar2.ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
 
@@ -247,7 +263,7 @@ def validate_strong_linear_plasma():
     beta = np.sqrt(1 - gamma ** -2)
     a = K / (beta * gamma * k_u)
     print(1e9 * a, 'nm')
-    trajectory = synchrad.track_particle_ion_collapse(a, 0, 0, 0, gamma, 1, plasma_density, 0, 0, 1e9, time_step, steps)
+    trajectory = synchrad.track_particle_bennett(a, 0, 0, 0, gamma, 1, plasma_density, 0, 0, 1e9, time_step, steps)
 
     energies, energies_midpoint, energies_step = synchrad.linspace_midpoint(1, 5e7, 200)
     phi_xs, phi_xs_midpoint, phi_xs_step = synchrad.linspace_midpoint(0, 7e-4, 100)
@@ -261,26 +277,26 @@ def validate_strong_linear_plasma():
 
     vmin1, vmax1 = dd1.min(), dd1.max()
     ax1.set_title('analytic')
-    ax1.pcolormesh(energies_midpoint, phi_xs_midpoint, dd1[:, :, 0].T, vmin=vmin1, vmax=vmax1, cmap='inferno')
+    ax1.pcolormesh(energies_midpoint, phi_xs_midpoint, dd1[:, :, 0].T, vmin=vmin1, vmax=vmax1, cmap='viridis')
     ax1.set_xlim(energies.min(), energies.max())
     ax1.set_ylim(phi_xs.min(), phi_xs.max())
     ax1.set_xlabel('photon energy (eV)')
     ax1.set_ylabel('$\\theta$ (rad)')
     ax1.xaxis.get_major_formatter().set_powerlimits((0, 1))
     ax1.yaxis.get_major_formatter().set_powerlimits((0, 1))
-    cbar1 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin1, vmax=vmax1), cmap='inferno'), ax=ax1)
+    cbar1 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin1, vmax=vmax1), cmap='viridis'), ax=ax1)
     cbar1.set_label('$\\frac{d^2 U}{d\\Omega d\\epsilon}$')
     cbar1.ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
 
     vmin2, vmax2 = dd2.min(), dd2.max()
     ax2.set_title('numerical')
-    ax2.pcolormesh(energies_midpoint, phi_xs_midpoint, dd2[:, :, 0].T, vmin=vmin2, vmax=vmax2, cmap='inferno')
+    ax2.pcolormesh(energies_midpoint, phi_xs_midpoint, dd2[:, :, 0].T, vmin=vmin2, vmax=vmax2, cmap='viridis')
     ax2.set_xlim(energies.min(), energies.max())
     ax2.set_ylim(phi_xs.min(), phi_xs.max())
     ax2.set_xlabel('photon energy (eV)')
     ax2.xaxis.get_major_formatter().set_powerlimits((0, 1))
     ax2.yaxis.get_major_formatter().set_powerlimits((0, 1))
-    cbar2 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin2, vmax=vmax2), cmap='inferno'), ax=ax2)
+    cbar2 = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin2, vmax=vmax2), cmap='viridis'), ax=ax2)
     cbar2.set_label('$\\frac{d^2 U}{d\\Omega d\\epsilon}$')
     cbar2.ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
 
@@ -288,8 +304,8 @@ def validate_strong_linear_plasma():
     plt.close(fig)
 
 if __name__ == '__main__':
-    validate_beam_tracking()
-    validate_weak_undulator()
+    #validate_beam_tracking()
+    #validate_weak_undulator()
     validate_strong_undulator()
-    validate_weak_linear_plasma()
-    validate_strong_linear_plasma()
+    #validate_weak_linear_plasma()
+    #validate_strong_linear_plasma()

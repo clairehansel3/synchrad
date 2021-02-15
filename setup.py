@@ -10,10 +10,10 @@ if platform.system() == 'Darwin':
 else:
     libsynchrad = 'libsynchrad.so'
 
-subprocess.run(['mkdir', '-p', 'build'], check=True)
-subprocess.run(['cmake', '-S', '.', '-B', 'build'], check=True)
-subprocess.run(['cmake', '--build', 'build'], check=True)
-subprocess.run(['mv', f'build/{libsynchrad}', '.'], check=True)
+subprocess.run(['mkdir', '-p', '.build'], check=True)
+subprocess.run(['cmake', '-S', '.', '-B', '.build'], check=True)
+subprocess.run(['cmake', '--build', '.build'], check=True)
+subprocess.run(['mv', f'.build/{libsynchrad}', '.'], check=True)
 
 setuptools.setup(
     name='synchrad',

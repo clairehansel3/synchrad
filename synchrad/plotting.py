@@ -5,8 +5,9 @@ import numpy as np
 
 c_light = 299792458
 
-def trajectory(t, trajectories, filename):
+def plot_trajectory(trajectories, step_size, filename):
     assert trajectories.shape[0] == 1
+    t = step_size * np.arange(trajectories.shape[1] + 1)
     x = trajectories[0, :, 0]
     y = trajectories[0, :, 1]
     bx = trajectories[0, :, 3]
@@ -29,7 +30,31 @@ def trajectory(t, trajectories, filename):
     fig.savefig(filename, dpi=300)
     plt.close(fig)
 
-def phase_space(trajectories, filename):
+def plot_spot(trajectories, step_size, filename, spot_size=None):
+    t = step_size * np.arange(trajectories.shape[1])
+    x = trajectories[:, :, 0]
+    y = trajectories[:, :, 1]
+    bx = trajectories[:, :, 3]
+    by = trajectories[:, :, 4]
+    r = np.sqrt(x ** 2 + y ** 2)
+    br = (x * bx + y * by) / r
+    z_cm = 100 * (np.mean(trajectories[:, :, 2], axis=0) + c_light * t)
+    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex=True)
+    ax1.plot(z_cm, np.std(x, axis=0), label='$\\sigma_{x}$ (m)')
+    ax1.plot(z_cm, np.std(y, axis=0), label='$\\sigma_{y}$ (m)')
+    if spot_size is not None:
+        ax1.plot(z_cm, np.ones_like(z_cm) * spot_size, label='$\\sigma_{\\mathrm{initial}}$ (m)')
+    ax1.get_yaxis().get_major_formatter().set_powerlimits((0, 1))
+    ax1.legend()
+    ax2.plot(z_cm, np.std(bx, axis=0), label='$\\sigma_{\\beta_x}$')
+    ax2.plot(z_cm, np.std(by, axis=0), label='$\\sigma_{\\beta_y}$')
+    ax2.get_yaxis().get_major_formatter().set_powerlimits((0, 1))
+    ax2.legend()
+    ax2.set_xlabel('z (cm)')
+    fig.savefig(filename, dpi=300)
+    plt.close(fig)
+
+def plot_phase_space(trajectories, filename):
     assert trajectories.shape[0] == 1
     x = trajectories[0, :, 0]
     y = trajectories[0, :, 1]
@@ -60,7 +85,7 @@ def phase_space(trajectories, filename):
     fig.savefig(filename, dpi=300)
     plt.close(fig)
 
-def transverse(trajectories, filename):
+def plot_transverse(trajectories, filename):
     assert trajectories.shape[0] == 1
     fig, ax = plt.subplots()
     limit = 1.05 * np.sqrt(trajectories[0, :, 0] ** 2 + trajectories[0, :, 1] ** 2).max()
@@ -75,7 +100,7 @@ def transverse(trajectories, filename):
     fig.savefig(filename, dpi=300)
     plt.close(fig)
 
-def distribution(double_differential, energies, phi_xs, phi_xs_midpoint, phi_ys, phi_ys_midpoint, filename, title=None):
+def plot_distribution(double_differential, energies, phi_xs, phi_xs_midpoint, phi_ys, phi_ys_midpoint, filename, title=None):
     distribution = np.sum((double_differential[:-1, :, :] * (energies[1:, np.newaxis, np.newaxis] - energies[:-1, np.newaxis, np.newaxis])), axis=0)
     vmin, vmax = distribution.min(), distribution.max()
     fig, ax = plt.subplots()
@@ -94,7 +119,7 @@ def distribution(double_differential, energies, phi_xs, phi_xs_midpoint, phi_ys,
     fig.savefig(filename, dpi=300)
     plt.close(fig)
 
-def spectrum(double_differential, energies, phi_xs_step, phi_ys_step, filename):
+def plot_spectrum(double_differential, energies, phi_xs_step, phi_ys_step, filename):
     assert double_differential.ndim == 3
     fig, ax = plt.subplots()
     ax.plot(energies, np.sum(double_differential, axis=(1, 2)) * phi_xs_step * phi_ys_step)
@@ -102,5 +127,21 @@ def spectrum(double_differential, energies, phi_xs_step, phi_ys_step, filename):
     ax.set_ylabel('$\\frac{dU}{d\\epsilon}$')
     ax.set_xscale('log')
     ax.set_yscale('log')
+    fig.savefig(filename, dpi=300)
+    plt.close(fig)
+
+def plot_double_differential(double_differential, energies, energies_midpoint, thetas, thetas_midpoint, filename):
+    fig, ax = plt.subplots()
+    vmin, vmax = double_differential.min(), double_differential.max()
+    ax.pcolormesh(energies_midpoint, thetas_midpoint * 1e3, double_differential[:, :, 0].T, vmin=vmin, vmax=vmax, cmap='inferno')
+    ax.set_xlim(energies.min(), energies.max())
+    ax.set_ylim(thetas.min() * 1e3, thetas.max() * 1e3)
+    ax.set_xscale('log')
+    ax.set_xlabel('photon energy (eV)')
+    ax.set_ylabel(r'$\theta$ (mrad)')
+    ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
+    cbar = fig.colorbar(cm.ScalarMappable(norm=colors.Normalize(vmin=vmin, vmax=vmax), cmap='inferno'), ax=ax)
+    cbar.set_label(r'$\frac{d^2 U}{d\Omega d\epsilon}$ per particle')
+    cbar.ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
     fig.savefig(filename, dpi=300)
     plt.close(fig)
