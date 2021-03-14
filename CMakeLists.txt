@@ -6,5 +6,5 @@ add_library(synchrad SHARED
 )
 
 set_target_properties(synchrad PROPERTIES CXX_EXTENSIONS OFF CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
-target_compile_options(synchrad PRIVATE -O3 -ffast-math)
+target_compile_options(synchrad PRIVATE -O3)
 install(TARGETS synchrad DESTINATION lib)

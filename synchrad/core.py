@@ -239,7 +239,7 @@ def track_beam_linear(particles, gamma_initial, ion_atomic_number,
             accelerating_field, time_step, steps)
     return result
 
-def compute_radiation_grid_single(trajectories, energies, phi_xs, phi_ys, time_step):
+def compute_radiation_grid_single(trajectories, energies, phi_xs, phi_ys, time_step, NaNs):
     assert all(isinstance(arg, np.ndarray) for arg in (trajectories, energies, phi_xs, phi_ys))
     assert all(arg.dtype == np.float64 for arg in (trajectories, energies, phi_xs, phi_ys))
     assert trajectories.ndim == 3
@@ -259,22 +259,37 @@ def compute_radiation_grid_single(trajectories, energies, phi_xs, phi_ys, time_s
     n_phi_xs = phi_xs.shape[0]
     n_phi_ys = phi_ys.shape[0]
     result = np.empty(dtype=np.float64, shape=(n_energies, n_phi_xs, n_phi_ys, 6))
-    synchrad_cxx_library.compute_radiation_grid(
-        result.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-        trajectories.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-        energies.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-        phi_xs.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-        phi_ys.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-        ctypes.c_size_t(n_particles),
-        ctypes.c_size_t(n_steps),
-        ctypes.c_size_t(n_energies),
-        ctypes.c_size_t(n_phi_xs),
-        ctypes.c_size_t(n_phi_ys),
-        ctypes.c_double(time_step)
-    )
+    if NaNs:
+        synchrad_cxx_library.compute_radiation_grid_nan(
+            result.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            trajectories.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            energies.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            phi_xs.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            phi_ys.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            ctypes.c_size_t(n_particles),
+            ctypes.c_size_t(n_steps),
+            ctypes.c_size_t(n_energies),
+            ctypes.c_size_t(n_phi_xs),
+            ctypes.c_size_t(n_phi_ys),
+            ctypes.c_double(time_step)
+        )
+    else:
+        synchrad_cxx_library.compute_radiation_grid(
+            result.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            trajectories.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            energies.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            phi_xs.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            phi_ys.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            ctypes.c_size_t(n_particles),
+            ctypes.c_size_t(n_steps),
+            ctypes.c_size_t(n_energies),
+            ctypes.c_size_t(n_phi_xs),
+            ctypes.c_size_t(n_phi_ys),
+            ctypes.c_double(time_step)
+        )
     return result
 
-def compute_radiation_list_single(trajectories, inputs, time_step):
+def compute_radiation_list_single(trajectories, inputs, time_step, NaNs):
     assert all(isinstance(arg, np.ndarray) for arg in (trajectories, inputs))
     assert all(arg.dtype == np.float64 for arg in (trajectories, inputs))
     assert trajectories.ndim == 3
@@ -289,15 +304,26 @@ def compute_radiation_list_single(trajectories, inputs, time_step):
     n_steps = trajectories.shape[1] - 1
     n_inputs = inputs.shape[0]
     result = np.empty(dtype=np.float64, shape=(n_inputs, 6))
-    synchrad_cxx_library.compute_radiation_list(
-        result.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-        trajectories.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-        inputs.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
-        ctypes.c_size_t(n_particles),
-        ctypes.c_size_t(n_steps),
-        ctypes.c_size_t(n_inputs),
-        ctypes.c_double(time_step)
-    )
+    if NaNs:
+        synchrad_cxx_library.compute_radiation_list_nan(
+            result.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            trajectories.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            inputs.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            ctypes.c_size_t(n_particles),
+            ctypes.c_size_t(n_steps),
+            ctypes.c_size_t(n_inputs),
+            ctypes.c_double(time_step)
+        )
+    else:
+        synchrad_cxx_library.compute_radiation_list(
+            result.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            trajectories.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            inputs.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
+            ctypes.c_size_t(n_particles),
+            ctypes.c_size_t(n_steps),
+            ctypes.c_size_t(n_inputs),
+            ctypes.c_double(time_step)
+        )
     return result
 
 def chunk(length, chunks):
@@ -312,7 +338,7 @@ def chunk(length, chunks):
     stop_indices = itertools.accumulate(chunk_sizes)
     return zip(start_indices, stop_indices)
 
-def compute_radiation_grid(trajectories, energies, phi_xs, phi_ys, time_step, threads=1):
+def compute_radiation_grid(trajectories, energies, phi_xs, phi_ys, time_step, threads=1, NaNs=False):
     """
     Computes d2U / (dOmega depsilon) from a set of trajectories. Scans over all
     combinations of photon energies and angles.
@@ -341,6 +367,9 @@ def compute_radiation_grid(trajectories, energies, phi_xs, phi_ys, time_step, th
         threads (optional, default=1): number of parallel threads to run on.
             Note that if this number exceeds the number of particles it is
             reduced to that number.
+        NaNs (optional, default=False): if this is on each particle can contain
+            NaN values at the start of its trajectory. E.g. x(t) = [NaN, NaN,
+            NaN, ..., NaN, 3.12e-6, 3.11e-6, 3.09e-6, ...].
 
     returns:
         numpy array of np.float64 with shape
@@ -354,16 +383,16 @@ def compute_radiation_grid(trajectories, energies, phi_xs, phi_ys, time_step, th
     """
     particles = trajectories.shape[0]
     if threads == 1:
-        return compute_radiation_grid_single(trajectories, energies, phi_xs, phi_ys, time_step)
+        return compute_radiation_grid_single(trajectories, energies, phi_xs, phi_ys, time_step, NaNs=NaNs)
     if threads > particles:
         threads = particles
     def compute_chunk(range):
         start, stop = range
-        return compute_radiation_grid_single(trajectories[start:stop], energies, phi_xs, phi_ys, time_step)
+        return compute_radiation_grid_single(trajectories[start:stop], energies, phi_xs, phi_ys, time_step, NaNs=NaNs)
     with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as pool:
         return sum(pool.map(compute_chunk, chunk(particles, threads)))
 
-def compute_radiation_list(trajectories, inputs, time_step, threads=1):
+def compute_radiation_list(trajectories, inputs, time_step, threads=1, NaNs=False):
     """
     Computes d2U / (dOmega depsilon) from a set of trajectories for different
     photon energies and angles.
@@ -391,6 +420,9 @@ def compute_radiation_list(trajectories, inputs, time_step, threads=1):
         threads (optional, default=1): number of parallel threads to run on.
             Note that if this number exceeds the number of particles it is
             reduced to that number.
+        NaNs (optional, default=False): if this is on each particle can contain
+            NaN values at the start of its trajectory. E.g. x(t) = [NaN, NaN,
+            NaN, ..., NaN, 3.12e-6, 3.11e-6, 3.09e-6, ...].
 
     returns:
         numpy array of np.float64 with shape
@@ -403,11 +435,11 @@ def compute_radiation_list(trajectories, inputs, time_step, threads=1):
     """
     particles = trajectories.shape[0]
     if threads == 1:
-        return compute_radiation_list_single(trajectories, inputs, time_step)
+        return compute_radiation_list_single(trajectories, inputs, time_step, NaNs=NaNs)
     if threads > particles:
         threads = particles
     def compute_chunk(range):
         start, stop = range
-        return compute_radiation_list(trajectories[start:stop], inputs, time_step)
+        return compute_radiation_list(trajectories[start:stop], inputs, time_step, NaNs=NaNs)
     with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as pool:
         return sum(pool.map(compute_chunk, chunk(particles, threads)))

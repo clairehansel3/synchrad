@@ -37,6 +37,17 @@ void compute_radiation_list(double* __restrict__ result,
   Particle* __restrict__ data, EnergyPhixPhiy* __restrict__ inputs,
   std::size_t n_particles, std::size_t n_steps, std::size_t n_inputs,
   double time_step);
+
+void compute_radiation_grid_nan(double* __restrict__ result, Particle* __restrict__ data,
+  double* __restrict__ energies, double* __restrict__ phi_xs,
+  double* __restrict__ phi_ys, std::size_t n_particles, std::size_t n_steps,
+  std::size_t n_energies, std::size_t n_phi_xs, std::size_t n_phi_ys,
+  double time_step);
+
+void compute_radiation_list_nan(double* __restrict__ result,
+  Particle* __restrict__ data, EnergyPhixPhiy* __restrict__ inputs,
+  std::size_t n_particles, std::size_t n_steps, std::size_t n_inputs,
+  double time_step);
 }
 
 [[noreturn]] static void new_signalhandler(int signum)
@@ -273,7 +284,7 @@ void compute_radiation_grid(double* __restrict__ result, Particle* __restrict__ 
 
             double t = time_step * o;
 
-            Particle particle = data[o + m * n_steps];
+            Particle particle = data[o + m * (n_steps + 1)];
 
             std::array<double, 3> n;
             std::array<double, 3> b;
@@ -342,7 +353,7 @@ void compute_radiation_list(double* __restrict__ result,
 
         double t = time_step * o;
 
-        Particle particle = data[o + m * n_steps];
+        Particle particle = data[o + m * (n_steps + 1)];
 
         std::array<double, 3> n;
         std::array<double, 3> b;
@@ -371,6 +382,190 @@ void compute_radiation_list(double* __restrict__ result,
         result[result_index + 3] += vector[1] * exponential_imag * denom * integration_multiplier * time_step * constant;
         result[result_index + 4] += vector[2] * exponential_real * denom * integration_multiplier * time_step * constant;
         result[result_index + 5] += vector[2] * exponential_imag * denom * integration_multiplier * time_step * constant;
+      }
+    }
+  }
+}
+
+void compute_radiation_grid_nan(double* __restrict__ result, Particle* __restrict__ data,
+  double* __restrict__ energies, double* __restrict__ phi_xs,
+  double* __restrict__ phi_ys, std::size_t n_particles, std::size_t n_steps,
+  std::size_t n_energies, std::size_t n_phi_xs, std::size_t n_phi_ys,
+  double time_step)
+{
+  SignalHandlerHelper signalhandlerhelper{};
+
+  //std::size_t i = 0;
+  //int percent = -1;
+
+  for (std::size_t j = 0; j != n_energies; ++j) {
+    double frequency = energies[j] / hbar_ev;
+    for (std::size_t k = 0; k != n_phi_xs; ++k) {
+      double phi_x = phi_xs[k];
+      for (std::size_t l = 0; l != n_phi_ys; ++l) {
+        double phi_y = phi_ys[l];
+
+        std::size_t result_index = 6 * (l + n_phi_ys * (k + n_phi_xs * j));
+        for (std::size_t a = 0; a != 6; ++a)
+          result[result_index + a] = 0.0;
+
+        for (std::size_t m = 0; m != n_particles; ++m) {
+          bool last_was_nan = true;
+          for (std::size_t o = 0; o != n_steps + 1; ++o) {
+            
+            /*
+            int new_percent = static_cast<int>((100 * i) / (n_energies * n_phi_xs * n_phi_ys * n_particles * (n_steps + 1)));
+            if (percent != new_percent) {
+              percent = new_percent;
+              std::cout << percent << '%' << std::endl;
+            }
+            ++i;
+            */
+
+            double t = time_step * o;
+
+            Particle particle = data[o + m * (n_steps + 1)];
+            
+            if (last_was_nan && std::isnan(particle.x))
+              continue;
+
+            std::array<double, 3> n;
+            std::array<double, 3> b;
+            std::array<double, 3> bd;
+            n[0] = std::sin(phi_x);
+            n[1] = std::sin(phi_y);
+            n[2] = std::sqrt(1 - std::pow(n[0], 2) - std::pow(n[1], 2));
+            b[0] = particle.bx;
+            b[1] = particle.by;
+            b[2] = std::sqrt(1 - std::pow(particle.g, -2) - std::pow(particle.bx, 2) - std::pow(particle.by, 2));
+            bd[0] = particle.bxd;
+            bd[1] = particle.byd;
+            bd[2] = -(particle.gd * std::pow(particle.g, -3) + particle.bx * particle.bxd + particle.by * particle.byd) / b[2];
+            auto vector = cross(n, cross(subtract(n, b), bd));
+            auto denom = std::pow(1 - dot(b, n), -2);
+            double n_transverse2 = std::pow(n[0], 2) + std::pow(n[1], 2);
+            double value = 0.5 * n_transverse2 + 0.125 * std::pow(n_transverse2, 2) + 0.0625 * std::pow(n_transverse2, 3);
+            double phase = frequency * ((t * value) - (n[0] * particle.x + n[1] * particle.y + n[2] * particle.zeta) / c_light);
+            double exponential_real = std::cos(phase);
+            double exponential_imag = std::sin(phase);
+            double val_1 = vector[0] * exponential_real * denom * time_step * constant;
+            double val_2 = vector[0] * exponential_imag * denom * time_step * constant;
+            double val_3 = vector[1] * exponential_real * denom * time_step * constant;
+            double val_4 = vector[1] * exponential_imag * denom * time_step * constant;
+            double val_5 = vector[2] * exponential_real * denom * time_step * constant;
+            double val_6 = vector[2] * exponential_imag * denom * time_step * constant;
+
+            double integration_multiplier;
+            if (last_was_nan) {
+              if (!std::isnan(val_1) || !std::isnan(val_2) || !std::isnan(val_3) || !std::isnan(val_4) || !std::isnan(val_5) || !std::isnan(val_6)) {
+                last_was_nan = false;
+                assert(!std::isnan(val_1) && !std::isnan(val_2) && !std::isnan(val_3) && !std::isnan(val_4) && !std::isnan(val_5) && !std::isnan(val_6));
+                integration_multiplier = 0.5;
+              }
+              else {
+                continue;
+              }
+            }
+            else {
+              assert(!std::isnan(val_1) && !std::isnan(val_2) && !std::isnan(val_3) && !std::isnan(val_4) && !std::isnan(val_5) && !std::isnan(val_6));
+              integration_multiplier = (o == n_steps) ? 0.5 : 1.0;
+            }
+            result[result_index + 0] += val_1 * integration_multiplier;
+            result[result_index + 1] += val_2 * integration_multiplier;
+            result[result_index + 2] += val_3 * integration_multiplier;
+            result[result_index + 3] += val_4 * integration_multiplier;
+            result[result_index + 4] += val_5 * integration_multiplier;
+            result[result_index + 5] += val_6 * integration_multiplier;
+          }
+        }
+      }
+    }
+  }
+}
+
+void compute_radiation_list_nan(double* __restrict__ result,
+  Particle* __restrict__ data, EnergyPhixPhiy* __restrict__ inputs,
+  std::size_t n_particles, std::size_t n_steps, std::size_t n_inputs,
+  double time_step)
+{
+  SignalHandlerHelper signalhandlerhelper{};
+
+  //std::size_t i = 0;
+  //int percent = -1;
+
+  for (std::size_t j = 0; j != n_inputs; ++j) {
+    double frequency = inputs[j].energy / hbar_ev;
+    double phi_x = inputs[j].phi_x;
+    double phi_y = inputs[j].phi_y;
+
+    std::size_t result_index = 6 * j;
+
+    for (std::size_t a = 0; a != 6; ++a)
+      result[result_index + a] = 0.0;
+
+    for (std::size_t m = 0; m != n_particles; ++m) {
+      bool last_was_nan = true;
+      for (std::size_t o = 0; o != n_steps + 1; ++o) {
+        /*
+        int new_percent = static_cast<int>((100 * i) / (n_inputs * n_particles * (n_steps + 1)));
+        if (percent != new_percent) {
+          percent = new_percent;
+          std::cout << percent << '%' << std::endl;
+        }
+        ++i;
+        */
+
+        double t = time_step * o;
+
+        Particle particle = data[o + m * (n_steps + 1)];
+
+        std::array<double, 3> n;
+        std::array<double, 3> b;
+        std::array<double, 3> bd;
+        n[0] = std::sin(phi_x);
+        n[1] = std::sin(phi_y);
+        n[2] = std::sqrt(1 - std::pow(n[0], 2) - std::pow(n[1], 2));
+        b[0] = particle.bx;
+        b[1] = particle.by;
+        b[2] = std::sqrt(1 - std::pow(particle.g, -2) - std::pow(particle.bx, 2) - std::pow(particle.by, 2));
+        bd[0] = particle.bxd;
+        bd[1] = particle.byd;
+        bd[2] = -(particle.gd * std::pow(particle.g, -3) + particle.bx * particle.bxd + particle.by * particle.byd) / b[2];
+        auto vector = cross(n, cross(subtract(n, b), bd));
+        auto denom = std::pow(1 - dot(b, n), -2);
+        double n_transverse2 = std::pow(n[0], 2) + std::pow(n[1], 2);
+        double value = 0.5 * n_transverse2 + 0.125 * std::pow(n_transverse2, 2) + 0.0625 * std::pow(n_transverse2, 3);
+        double phase = frequency * ((t * value) - (n[0] * particle.x + n[1] * particle.y + n[2] * particle.zeta) / c_light);
+        double exponential_real = std::cos(phase);
+        double exponential_imag = std::sin(phase);
+        double val_1 = vector[0] * exponential_real * denom * time_step * constant;
+        double val_2 = vector[0] * exponential_imag * denom * time_step * constant;
+        double val_3 = vector[1] * exponential_real * denom * time_step * constant;
+        double val_4 = vector[1] * exponential_imag * denom * time_step * constant;
+        double val_5 = vector[2] * exponential_real * denom * time_step * constant;
+        double val_6 = vector[2] * exponential_imag * denom * time_step * constant;
+
+        double integration_multiplier;
+        if (last_was_nan) {
+          if (!std::isnan(val_1) || !std::isnan(val_2) || !std::isnan(val_3) || !std::isnan(val_4) || !std::isnan(val_5) || !std::isnan(val_6)) {
+            last_was_nan = false;
+            assert(!std::isnan(val_1) && !std::isnan(val_2) && !std::isnan(val_3) && !std::isnan(val_4) && !std::isnan(val_5) && !std::isnan(val_6));
+            integration_multiplier = 0.5;
+          }
+          else {
+            continue;
+          }
+        }
+        else {
+          assert(!std::isnan(val_1) && !std::isnan(val_2) && !std::isnan(val_3) && !std::isnan(val_4) && !std::isnan(val_5) && !std::isnan(val_6));
+          integration_multiplier = (o == n_steps) ? 0.5 : 1.0;
+        }
+        result[result_index + 0] += val_1 * integration_multiplier;
+        result[result_index + 1] += val_2 * integration_multiplier;
+        result[result_index + 2] += val_3 * integration_multiplier;
+        result[result_index + 3] += val_4 * integration_multiplier;
+        result[result_index + 4] += val_5 * integration_multiplier;
+        result[result_index + 5] += val_6 * integration_multiplier;
       }
     }
   }
