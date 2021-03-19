@@ -304,8 +304,8 @@ def validate_strong_linear_plasma():
     plt.close(fig)
 
 if __name__ == '__main__':
-    #validate_beam_tracking()
-    #validate_weak_undulator()
+    validate_beam_tracking()
+    validate_weak_undulator()
     validate_strong_undulator()
-    #validate_weak_linear_plasma()
-    #validate_strong_linear_plasma()
+    validate_weak_linear_plasma()
+    validate_strong_linear_plasma()

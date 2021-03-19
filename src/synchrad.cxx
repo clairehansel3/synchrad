@@ -284,7 +284,7 @@ void compute_radiation_grid(double* __restrict__ result, Particle* __restrict__ 
 
             double t = time_step * o;
 
-            Particle particle = data[o + m * (n_steps + 1)];
+            Particle particle = data[o + m * (n_steps)];
 
             std::array<double, 3> n;
             std::array<double, 3> b;
@@ -353,7 +353,7 @@ void compute_radiation_list(double* __restrict__ result,
 
         double t = time_step * o;
 
-        Particle particle = data[o + m * (n_steps + 1)];
+        Particle particle = data[o + m * (n_steps)];
 
         std::array<double, 3> n;
         std::array<double, 3> b;
@@ -424,7 +424,7 @@ void compute_radiation_grid_nan(double* __restrict__ result, Particle* __restric
 
             double t = time_step * o;
 
-            Particle particle = data[o + m * (n_steps + 1)];
+            Particle particle = data[o + m * (n_steps)];
             
             if (last_was_nan && std::isnan(particle.x))
               continue;
@@ -455,20 +455,23 @@ void compute_radiation_grid_nan(double* __restrict__ result, Particle* __restric
             double val_5 = vector[2] * exponential_real * denom * time_step * constant;
             double val_6 = vector[2] * exponential_imag * denom * time_step * constant;
 
-            double integration_multiplier;
+            double integration_multiplier = 1;
             if (last_was_nan) {
               if (!std::isnan(val_1) || !std::isnan(val_2) || !std::isnan(val_3) || !std::isnan(val_4) || !std::isnan(val_5) || !std::isnan(val_6)) {
                 last_was_nan = false;
                 assert(!std::isnan(val_1) && !std::isnan(val_2) && !std::isnan(val_3) && !std::isnan(val_4) && !std::isnan(val_5) && !std::isnan(val_6));
-                integration_multiplier = 0.5;
+                //integration_multiplier = 0.5;
               }
               else {
                 continue;
               }
             }
             else {
-              assert(!std::isnan(val_1) && !std::isnan(val_2) && !std::isnan(val_3) && !std::isnan(val_4) && !std::isnan(val_5) && !std::isnan(val_6));
-              integration_multiplier = (o == n_steps) ? 0.5 : 1.0;
+              if (std::isnan(val_1) || std::isnan(val_2) || std::isnan(val_3) || std::isnan(val_4) || std::isnan(val_5) || std::isnan(val_6)) {
+                break;
+              }
+              //assert(!std::isnan(val_1) && !std::isnan(val_2) && !std::isnan(val_3) && !std::isnan(val_4) && !std::isnan(val_5) && !std::isnan(val_6));
+              //integration_multiplier = (o == n_steps) ? 0.5 : 1.0;
             }
             result[result_index + 0] += val_1 * integration_multiplier;
             result[result_index + 1] += val_2 * integration_multiplier;
@@ -517,7 +520,7 @@ void compute_radiation_list_nan(double* __restrict__ result,
 
         double t = time_step * o;
 
-        Particle particle = data[o + m * (n_steps + 1)];
+        Particle particle = data[o + m * (n_steps)];
 
         std::array<double, 3> n;
         std::array<double, 3> b;
