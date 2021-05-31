@@ -284,7 +284,7 @@ void compute_radiation_grid(double* __restrict__ result, Particle* __restrict__ 
 
             double t = time_step * o;
 
-            Particle particle = data[o + m * (n_steps)];
+            Particle particle = data[o + m * (n_steps + 1)];
 
             std::array<double, 3> n;
             std::array<double, 3> b;
@@ -353,7 +353,7 @@ void compute_radiation_list(double* __restrict__ result,
 
         double t = time_step * o;
 
-        Particle particle = data[o + m * (n_steps)];
+        Particle particle = data[o + m * (n_steps + 1)];
 
         std::array<double, 3> n;
         std::array<double, 3> b;
@@ -424,7 +424,7 @@ void compute_radiation_grid_nan(double* __restrict__ result, Particle* __restric
 
             double t = time_step * o;
 
-            Particle particle = data[o + m * (n_steps)];
+            Particle particle = data[o + m * (n_steps + 1)];
             
             if (last_was_nan && std::isnan(particle.x))
               continue;
@@ -520,7 +520,7 @@ void compute_radiation_list_nan(double* __restrict__ result,
 
         double t = time_step * o;
 
-        Particle particle = data[o + m * (n_steps)];
+        Particle particle = data[o + m * (n_steps + 1)];
 
         std::array<double, 3> n;
         std::array<double, 3> b;
